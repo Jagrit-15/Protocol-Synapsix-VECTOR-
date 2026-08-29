@@ -1,0 +1,26 @@
+# Protocol Synapsix — Cursor Rules
+
+## Naming conventions
+- Database columns: snake_case
+- Dart/TypeScript variables & functions: camelCase
+- Classes, widgets, React components: PascalCase
+
+## Folder structure (do not deviate)
+mobile/lib/features/<feature>/{data,domain,presentation}/ — Clean Architecture split:
+  data = I/O (sensors, storage, network), domain = pure logic/models (unit-testable),
+  presentation = widgets/screens.
+backend/app/{api,core,services,schemas}/
+dashboard/src/{pages,components,hooks,lib,types}/
+
+## Runtime agent placeholders — IMPORTANT
+The five runtime "agents" (SensorIngestionAgent, MotionClassifierAgent, LearnedOdometryAgent,
+FusionAgent/EKF, MapMatchingAgent) are PLACEHOLDER-ONLY. Do not implement real Kalman
+filtering, real TFLite inference, or real HMM map-matching unless explicitly told to.
+Every file for these must keep its `// TODO(agentic-workflow): replace with real
+implementation` comment at the top. The real implementations will be supplied separately —
+your job is only to keep the interfaces/shapes correct so they're a drop-in replacement later.
+
+## General
+- Every network/sensor call: wrapped in try/catch, typed error surfaced to UI. No silent failures.
+- Preserve existing inline comments when editing files — never strip them.
+- Never write real API keys into any file. Only `.env.example` with placeholder values.
