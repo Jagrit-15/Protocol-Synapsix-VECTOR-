@@ -8,11 +8,12 @@ class AppSupabaseClient {
       AppConstants.supabaseUrl.isNotEmpty &&
       AppConstants.supabaseAnonKey.isNotEmpty;
 
-  Future<void> init() async {
+      Future<void> init() async {
     if (!isConfigured) {
-      throw const NetworkException(
-        'Supabase URL/anon key not set (expected via --dart-define).',
-      );
+      // Supabase not configured yet — skip init so the app can still run
+      // fully offline (core DR pipeline doesn't need it). Wire this up
+      // for real once Supabase project setup is done.
+      return;
     }
     await Supabase.initialize(
       url: AppConstants.supabaseUrl,

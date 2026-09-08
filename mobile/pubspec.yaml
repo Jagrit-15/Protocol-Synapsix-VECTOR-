@@ -31,23 +31,29 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Sensor/location foundation (Phase 1, buildlist Step 1)
+  sensors_plus: ^6.1.1
+  geolocator: ^13.0.2
+  permission_handler: ^11.3.1
+  sqflite: ^2.4.1
+  path: ^1.9.0
+  path_provider: ^2.1.4
+  intl: ^0.19.0
+
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
   # Pinned stack (SIH26168). Several are imported only as placeholders for later slices.
-  sensors_plus: ^6.1.1
-  geolocator: ^13.0.2
   tflite_flutter: ^0.12.1
   flutter_map: ^8.1.1
   latlong2: ^0.9.1
-  sqflite: ^2.4.1
   flutter_riverpod: ^2.6.1
   flutter_background_service: ^5.1.0
   fl_chart: ^0.70.2
   http: ^1.2.2
-  supabase_flutter: ^2.17.2
   flutter_dotenv: ^6.0.1
+  supabase_flutter: ^2.17.2
 
 dev_dependencies:
   flutter_test:
@@ -74,6 +80,7 @@ flutter:
   assets:
     - assets/models/
     - assets/maps/
+    - .env
 
   # To add assets to your application, add an assets section, like this:
   # assets:

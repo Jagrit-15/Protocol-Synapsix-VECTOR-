@@ -8,6 +8,7 @@ import 'features/navigation/presentation/debug_screen.dart';
 import 'features/navigation/presentation/home_map_screen.dart';
 import 'features/navigation/presentation/onboarding_screen.dart';
 import 'features/navigation/presentation/turn_by_turn_screen.dart';
+import 'features/sensors/presentation/sensor_debug_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/trips/presentation/trip_history_screen.dart';
 import 'features/trips/presentation/trip_summary_screen.dart';
@@ -31,6 +32,7 @@ class ProtocolSynapsixApp extends StatelessWidget {
           '/trip-summary': (_) => TripSummaryScreen(),
           '/settings': (_) => const SettingsScreen(),
           '/debug': (_) => const DebugScreen(),
+          '/sensor-debug': (_) => const SensorDebugScreen(),
         },
       ),
     );

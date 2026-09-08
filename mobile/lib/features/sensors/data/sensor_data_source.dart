@@ -1,5 +1,8 @@
-// PLACEHOLDER wrapper around sensors_plus + geolocator.
-// Demo path never requires this to succeed — DemoScenarioController injects frames.
+// Continuous sensor streaming with a latest-value buffer for timestamp alignment.
+// Each sensor arrives at its own rate; we keep the most recent reading from
+// each and combine them when a frame is requested.
+
+import 'dart:async';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -7,56 +10,93 @@ import 'package:sensors_plus/sensors_plus.dart';
 import '../domain/sensor_frame.dart';
 
 class SensorDataSource {
-  Future<SensorFrame> readOnce() async {
-    Vector3 accel = const Vector3(0, 0, 9.81);
-    Vector3 gyro = const Vector3(0, 0, 0);
-    Vector3 mag = const Vector3(0, 0, 0);
-    GnssFix? gnss;
+  Vector3 _lastAccel = const Vector3(0, 0, 9.81);
+  Vector3 _lastGyro = const Vector3(0, 0, 0);
+  Vector3 _lastMag = const Vector3(0, 0, 0);
+  GnssFix? _lastGnss;
+
+  StreamSubscription<AccelerometerEvent>? _accelSub;
+  StreamSubscription<GyroscopeEvent>? _gyroSub;
+  StreamSubscription<MagnetometerEvent>? _magSub;
+  StreamSubscription<Position>? _gnssSub;
+
+  bool _started = false;
+
+  /// Begin listening to all sensor streams. Safe to call once at app/agent
+  /// startup. Individual sensor failures (unavailable hardware) are caught
+  /// so one missing sensor doesn't block the others.
+  Future<void> start() async {
+    if (_started) return;
+    _started = true;
 
     try {
-      final event = await accelerometerEventStream().first.timeout(
-            const Duration(milliseconds: 200),
-          );
-      accel = Vector3(event.x, event.y, event.z);
+      _accelSub = accelerometerEventStream().listen((event) {
+        _lastAccel = Vector3(event.x, event.y, event.z);
+      });
     } catch (_) {
-      // Hardware unavailable in emulator / desktop — keep zeros.
+      // Hardware unavailable — keep last known (or default) value.
     }
 
     try {
-      final event = await gyroscopeEventStream().first.timeout(
-            const Duration(milliseconds: 200),
-          );
-      gyro = Vector3(event.x, event.y, event.z);
+      _gyroSub = gyroscopeEventStream().listen((event) {
+        _lastGyro = Vector3(event.x, event.y, event.z);
+      });
     } catch (_) {}
 
     try {
-      final event = await magnetometerEventStream().first.timeout(
-            const Duration(milliseconds: 200),
-          );
-      mag = Vector3(event.x, event.y, event.z);
+      _magSub = magnetometerEventStream().listen((event) {
+        _lastMag = Vector3(event.x, event.y, event.z);
+      });
     } catch (_) {}
 
     try {
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(milliseconds: 400),
-        ),
-      );
-      gnss = GnssFix(
-        lat: pos.latitude,
-        lon: pos.longitude,
-        accuracyM: pos.accuracy,
-        headingDeg: pos.heading,
-      );
+      final hasPermission = await _ensureLocationPermission();
+      if (hasPermission) {
+        _gnssSub = Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 0,
+          ),
+        ).listen((pos) {
+          _lastGnss = GnssFix(
+            lat: pos.latitude,
+            lon: pos.longitude,
+            accuracyM: pos.accuracy,
+            headingDeg: pos.heading,
+          );
+        });
+      }
     } catch (_) {}
+  }
 
+  Future<bool> _ensureLocationPermission() async {
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    return permission == LocationPermission.always ||
+        permission == LocationPermission.whileInUse;
+  }
+
+  /// Returns the most recently buffered reading from each sensor, combined
+  /// into one timestamp-aligned frame. This is the "alignment buffer" —
+  /// sensors arrive at different rates, so we snapshot whatever is freshest
+  /// from each at the moment this is called.
+  SensorFrame currentFrame() {
     return SensorFrame(
       timestamp: DateTime.now(),
-      accel: accel,
-      gyro: gyro,
-      mag: mag,
-      gnss: gnss,
+      accel: _lastAccel,
+      gyro: _lastGyro,
+      mag: _lastMag,
+      gnss: _lastGnss,
     );
+  }
+
+  Future<void> dispose() async {
+    await _accelSub?.cancel();
+    await _gyroSub?.cancel();
+    await _magSub?.cancel();
+    await _gnssSub?.cancel();
+    _started = false;
   }
 }
