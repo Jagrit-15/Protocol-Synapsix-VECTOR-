@@ -8,15 +8,19 @@ import 'package:sqflite/sqflite.dart';
 import '../domain/sensor_frame.dart';
 import '../domain/sensor_ingestion_agent.dart';
 import 'raw_sensor_log_db.dart';
+import 'sensor_recording_manager.dart';
 
 class RawSensorLogger {
   RawSensorLogger({
     required SensorIngestionAgent agent,
     this.batchSize = 20,
-  }) : _agent = agent;
+    SensorRecordingManager? recordingManager,
+  })  : _agent = agent,
+        _recordingManager = recordingManager ?? SensorRecordingManager();
 
   final SensorIngestionAgent _agent;
   final int batchSize;
+  final SensorRecordingManager _recordingManager;
 
   StreamSubscription<SensorFrame>? _sub;
   final List<SensorFrame> _pending = [];
@@ -45,6 +49,9 @@ class RawSensorLogger {
 
     final db = await RawSensorLogDb.instance.database;
     final batch = db.batch();
+    final activeRecordingId = _recordingManager.activeRecording?.id;
+    final activeLabel = _recordingManager.activeRecording?.label?.csvValue;
+
     for (final frame in toWrite) {
       batch.insert('raw_sensor_samples', {
         'ts_ms': frame.timestamp.millisecondsSinceEpoch,
@@ -62,6 +69,8 @@ class RawSensorLogger {
         'gnss_lon': frame.gnss?.lon,
         'gnss_accuracy_m': frame.gnss?.accuracyM,
         'gnss_heading_deg': frame.gnss?.headingDeg,
+        'recording_id': activeRecordingId,
+        'label': activeLabel,
       });
     }
     await batch.commit(noResult: true);
@@ -92,4 +101,7 @@ class RawSensorLogger {
         await db.rawQuery('SELECT COUNT(*) as c FROM raw_sensor_samples');
     return Sqflite.firstIntValue(result) ?? 0;
   }
+
+  /// Access the recording manager for starting/stopping labeled recordings.
+  SensorRecordingManager get recordingManager => _recordingManager;
 }

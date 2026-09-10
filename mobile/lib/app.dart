@@ -22,7 +22,7 @@ class ProtocolSynapsixApp extends StatelessWidget {
       child: MaterialApp(
         title: AppConstants.appName,
         theme: AppTheme.light(),
-        initialRoute: '/onboarding',
+        initialRoute: '/sensor-debug',
         routes: {
           '/onboarding': (_) => const OnboardingScreen(),
           '/login': (_) => const LoginScreen(),

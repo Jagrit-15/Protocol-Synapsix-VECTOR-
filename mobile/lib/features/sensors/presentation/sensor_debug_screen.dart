@@ -1,9 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../../../services/sensor_pipeline_service.dart';
 import '../domain/sensor_frame.dart';
+import '../domain/sensor_recording.dart';
+import '../domain/sensor_recording_label.dart';
 import 'sensor_status_chip.dart';
 
 class SensorDebugScreen extends StatefulWidget {
@@ -15,10 +20,15 @@ class SensorDebugScreen extends StatefulWidget {
 
 class _SensorDebugScreenState extends State<SensorDebugScreen> {
   final _service = SensorPipelineService.instance;
+
   StreamSubscription<SensorFrame>? _sub;
   SensorFrame? _latest;
   int _loggedCount = 0;
-  Timer? _countTimer;
+  List<SensorRecording> _recordings = [];
+  Timer? _refreshTimer;
+
+  SensorRecordingLabel _selectedLabel = SensorRecordingLabel.stationary;
+  String? _lastExportPath;
 
   @override
   void initState() {
@@ -26,23 +36,73 @@ class _SensorDebugScreenState extends State<SensorDebugScreen> {
     _sub = _service.frames.listen((frame) {
       if (mounted) setState(() => _latest = frame);
     });
-    _refreshCount();
-    _countTimer = Timer.periodic(
+    _refresh();
+    _refreshTimer = Timer.periodic(
       const Duration(seconds: 2),
-      (_) => _refreshCount(),
+      (_) => _refresh(),
     );
   }
 
-  Future<void> _refreshCount() async {
+  Future<void> _refresh() async {
     final c = await _service.logger.count();
-    if (mounted) setState(() => _loggedCount = c);
+    final recs = await _service.logger.recordingManager.listRecordings(limit: 20);
+    if (mounted) {
+      setState(() {
+        _loggedCount = c;
+        _recordings = recs;
+      });
+    }
   }
 
   @override
   void dispose() {
     _sub?.cancel();
-    _countTimer?.cancel();
+    _refreshTimer?.cancel();
     super.dispose();
+  }
+
+  bool get _isRecording => _service.logger.recordingManager.activeRecording != null;
+
+  Future<void> _toggleRecording() async {
+    final manager = _service.logger.recordingManager;
+    if (_isRecording) {
+      final active = manager.activeRecording!;
+      await manager.stopRecording();
+      // Auto-compute ground truth if this recording has GNSS data — safe
+      // to attempt, throws StateError (caught) if no GNSS fixes were
+      // captured, which is expected for indoor/stationary/walking tests.
+      try {
+        await manager.computeGroundTruth(active.id);
+      } catch (_) {}
+    } else {
+      await manager.startRecording(label: _selectedLabel);
+    }
+    if (mounted) setState(() {});
+    await _refresh();
+  }
+
+  Future<void> _exportRecording(SensorRecording recording) async {
+    final csv = await _service.logger.recordingManager.exportToCsv(
+      recording.id,
+      includeGroundTruth: true,
+    );
+
+    final dir = await getApplicationDocumentsDirectory();
+    final filename = '${recording.id}.csv';
+    final path = p.join(dir.path, filename);
+    await File(path).writeAsString(csv);
+
+    setState(() => _lastExportPath = path);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Exported to $path')),
+      );
+    }
+  }
+
+  Future<void> _deleteRecording(SensorRecording recording) async {
+    await _service.logger.recordingManager.deleteRecording(recording.id);
+    await _refresh();
   }
 
   @override
@@ -67,7 +127,7 @@ class _SensorDebugScreenState extends State<SensorDebugScreen> {
               SensorStatusChip(label: 'IMU', ok: hasAccel),
               SensorStatusChip(label: 'GNSS', ok: hasGnss),
               SensorStatusChip(
-                label: '$_loggedCount samples logged',
+                label: '$_loggedCount raw samples',
                 ok: _loggedCount > 0,
               ),
             ],
@@ -103,11 +163,88 @@ class _SensorDebugScreenState extends State<SensorDebugScreen> {
                   )
                 : const Text('No GNSS fix yet'),
           ),
-          _SectionCard(
-            title: 'Last frame timestamp',
-            child: Text(frame?.timestamp.toIso8601String() ?? '—'),
+          const Divider(height: 32),
+          Text(
+            'Training Data Recording',
+            style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 12),
+          _SectionCard(
+            title: 'Label',
+            child: DropdownButton<SensorRecordingLabel>(
+              value: _selectedLabel,
+              isExpanded: true,
+              onChanged: _isRecording
+                  ? null
+                  : (v) => setState(() => _selectedLabel = v!),
+              items: SensorRecordingLabel.values
+                  .map((s) => DropdownMenuItem(
+                        value: s,
+                        child: Text(s.csvValue),
+                      ))
+                  .toList(),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _toggleRecording,
+                  icon: Icon(
+                    _isRecording ? Icons.stop_circle : Icons.fiber_manual_record,
+                    color: _isRecording ? Colors.red : null,
+                  ),
+                  label: Text(
+                    _isRecording
+                        ? 'Stop recording (${_selectedLabel.csvValue})'
+                        : 'Start recording',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Past recordings',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          if (_recordings.isEmpty)
+            const Text('No recordings yet')
+          else
+            ..._recordings.map((r) => Card(
+                  child: ListTile(
+                    title: Text(r.label?.csvValue ?? 'unlabeled'),
+                    subtitle: Text(
+                      '${r.sampleCount} samples · '
+                      '${r.duration.inSeconds}s'
+                      '${r.isActive ? ' · recording…' : ''}',
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.upload_file),
+                          onPressed: r.isActive
+                              ? null
+                              : () => _exportRecording(r),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => _deleteRecording(r),
+                        ),
+                      ],
+                    ),
+                  ),
+                )),
+          if (_lastExportPath != null) ...[
+            const SizedBox(height: 8),
+            SelectableText(
+              'Last export: $_lastExportPath',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 20),
           Row(
             children: [
               Expanded(
