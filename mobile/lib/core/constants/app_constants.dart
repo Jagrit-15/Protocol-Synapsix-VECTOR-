@@ -5,9 +5,10 @@ class AppConstants {
   static const String appName = 'Protocol Synapsix';
   static const String problemCode = 'SIH26168';
 
-  /// Demo origin (New Delhi). PLACEHOLDER until live GNSS origin is wired.
-  static const double demoOriginLat = 28.6139;
-  static const double demoOriginLon = 77.2090;
+  /// Demo origin (Kolkata — BBD Bagh area, matches a known segment in
+  /// kolkata_road_graph.json so the synthetic demo path snaps to real roads).
+  static const double demoOriginLat = 22.5539;
+  static const double demoOriginLon = 88.3318;
 
   static const Duration pipelineTick = Duration(milliseconds: 500);
   static const Duration gnssDropoutDuration = Duration(seconds: 20);

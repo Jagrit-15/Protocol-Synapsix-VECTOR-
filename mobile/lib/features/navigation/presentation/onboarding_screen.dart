@@ -59,7 +59,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                '${AppConstants.problemCode} — intelligent dead-reckoning demo skeleton.',
+                AppConstants.problemCode + ' - intelligent dead-reckoning demo skeleton.',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 24),
@@ -74,12 +74,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               const Spacer(),
               FilledButton(
                 onPressed: _busy ? null : _requestPermissions,
-                child: Text(_busy ? 'Checking…' : 'Continue to map demo'),
+                child: Text(_busy ? 'Checking...' : 'Continue to map demo'),
               ),
               TextButton(
                 onPressed: () =>
                     Navigator.of(context).pushReplacementNamed('/home'),
                 child: const Text('Skip permissions'),
+              ),
+              TextButton(
+                onPressed: () =>
+                    Navigator.of(context).pushNamed('/sensor-debug'),
+                child: const Text('Sensor debug screen'),
               ),
             ],
           ),

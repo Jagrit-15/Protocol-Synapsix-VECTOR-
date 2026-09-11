@@ -8,10 +8,11 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mobile/app.dart';
+import 'package:mobile/features/map_matching/osm_graph/osm_graph.dart';
 
 void main() {
   testWidgets('Onboarding smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(const ProtocolSynapsixApp());
+    await tester.pumpWidget(ProtocolSynapsixApp(osmGraph: OsmGraph.empty()));
     expect(find.textContaining('Protocol Synapsix'), findsWidgets);
   });
 }

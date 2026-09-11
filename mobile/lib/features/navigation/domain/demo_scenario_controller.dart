@@ -32,7 +32,7 @@ class DemoScenarioController extends ChangeNotifier {
         _classifier = classifier ?? ScriptedMotionClassifierAgent(),
         _odometry = odometry ?? BoundedRandomOdometryAgent(),
         _fusion = fusion ?? LinearBlendFusionAgent(),
-        _matcher = matcher ?? PassthroughMapMatchingAgent();
+        _matcher = matcher ?? PassthroughMapMatchingAgent(); // TODO: swap to HmmMapMatchingAgent once OsmGraph is loaded at app startup (async — see osm_graph.dart's loadFromAsset)
 
   final SensorIngestionAgent _ingestion;
   final MotionClassifierAgent _classifier;
